@@ -82,13 +82,13 @@ class MainSyncWorker(QThread):
                         money_cod = row[cod_header]
                         total_price = money_bank + money_cod
                         
-                        data.append([ma, total_price, money_bank, money_cod])
+                        data.append([ma, total_price, money_bank, money_cod, sheet.title])
                 
                 except Exception as e:
                     self.status_signal.emit(f"  ✗ Lỗi khi xử lý sheet '{sheet.title}': {str(e)}")
                     continue
             
-            data_df = pd.DataFrame(data, columns=['mã máy', 'giá', 'chuyển khoản', 'cod'])
+            data_df = pd.DataFrame(data, columns=['mã máy', 'giá', 'chuyển khoản', 'cod', 'sheet_name'])
             data_df.drop_duplicates(subset=['mã máy'], keep='last', inplace=True)
             
             self.status_signal.emit(f"✓ Đã tìm thấy {len(data_df)} đơn hàng")
@@ -119,6 +119,15 @@ class MainSyncWorker(QThread):
                         self.status_signal.emit(f"  ⚠ Sheet '{sheet.title}': Thiếu cột Sale/Mã máy/Giá bán. Bỏ qua.")
                         continue
                     
+                    customer_idx = None
+                    try:
+                        for cust_kw in ['khách mua', 'khach mua', 'customer', 'buyer']:
+                            if cust_kw in clean_header:
+                                customer_idx = clean_header.index(cust_kw) + 1
+                                break
+                    except ValueError:
+                        pass
+                    
                     code_list_raw = sheet.col_values(lap_code_idx)
                     cells_to_update = []
                     
@@ -131,6 +140,7 @@ class MainSyncWorker(QThread):
                             price_val = row_data['giá']
                             cod_val = row_data['cod']
                             bank_val = row_data['chuyển khoản']
+                            sheet_name = row_data['sheet_name']
                             
                             if cod_val == 0 and bank_val == 0:
                                 cells_to_update.append(Cell(real_row, sale_idx, 'Available'))
@@ -138,6 +148,9 @@ class MainSyncWorker(QThread):
                             else:
                                 cells_to_update.append(Cell(real_row, sale_idx, 'SOLD'))
                                 cells_to_update.append(Cell(real_row, price_idx, float(price_val)))
+                            
+                            if customer_idx:
+                                cells_to_update.append(Cell(real_row, customer_idx, sheet_name))
                     
                     if cells_to_update:
                         self.status_signal.emit(f"  ⚡ Đang cập nhật {len(cells_to_update)} ô tại '{sheet.title}'...")
