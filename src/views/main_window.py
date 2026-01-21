@@ -11,6 +11,8 @@ from PyQt5.QtCore import Qt, QPoint, QPropertyAnimation, QSize, QSettings
 from PyQt5.QtGui import QIcon, QFont, QColor, QPalette
 from .ui_styles import Styles
 
+from .canvas import Canvas
+
 
 class MainWindow(QMainWindow):
     """
@@ -78,6 +80,9 @@ class MainWindow(QMainWindow):
         
         self.tab_partners = self._create_partners_tab()
         self.tab_widget.addTab(self.tab_partners, "Đối Tác")
+
+        self.tab_statistics = self._create_statistics_tab()
+        self.tab_widget.addTab(self.tab_statistics, 'Thống kê')
         
         content_layout.addWidget(self.tab_widget)
         
@@ -285,6 +290,75 @@ class MainWindow(QMainWindow):
         status_layout.addStretch()
         
         layout.addLayout(status_layout)
+        
+        return tab
+    
+    def _create_statistics_tab(self):
+        tab = QWidget()
+        layout = QVBoxLayout(tab)
+        layout.setSpacing(15)
+        
+        title = QLabel("Thống kê")
+        title.setObjectName("tab_title")
+        title.setAlignment(Qt.AlignCenter)
+        layout.addWidget(title)
+        
+        controls_layout = QHBoxLayout()
+        
+        date_label = QLabel("Thời gian:")
+        controls_layout.addWidget(date_label)
+        
+        self.stats_date_combo = QComboBox()
+        self.stats_date_combo.setObjectName("settings_combo")
+        self.stats_date_combo.addItems(["Tất cả"])
+        self.stats_date_combo.setMinimumWidth(150)
+        controls_layout.addWidget(self.stats_date_combo)
+        
+        controls_layout.addSpacing(20)
+        
+        chart_type_label = QLabel("Loại biểu đồ:")
+        controls_layout.addWidget(chart_type_label)
+        
+        self.stats_chart_type_combo = QComboBox()
+        self.stats_chart_type_combo.setObjectName("settings_combo")
+        self.stats_chart_type_combo.addItems(["Cột", "Đường", "Tròn", "Thanh ngang"])
+        self.stats_chart_type_combo.setMinimumWidth(150)
+        controls_layout.addWidget(self.stats_chart_type_combo)
+        
+        controls_layout.addSpacing(20)
+        
+        value_label = QLabel("Giá trị:")
+        controls_layout.addWidget(value_label)
+        
+        self.stats_value_combo = QComboBox()
+        self.stats_value_combo.setObjectName("settings_combo")
+        self.stats_value_combo.addItems(["Doanh thu", "Số lượng bán", "Tồn kho", "Đối tác", "Nhân viên"])
+        self.stats_value_combo.setMinimumWidth(150)
+        controls_layout.addWidget(self.stats_value_combo)
+        
+        controls_layout.addStretch()
+        
+        layout.addLayout(controls_layout)
+        
+        content_layout = QHBoxLayout()
+        
+        self.stats_canvas = Canvas(self)
+        content_layout.addWidget(self.stats_canvas, stretch=7)
+        
+        stats_info_group = QGroupBox("Thông tin thống kê")
+        stats_info_group.setObjectName("settings_group")
+        stats_info_layout = QVBoxLayout(stats_info_group)
+        
+        self.stats_info_text = QTextEdit()
+        self.stats_info_text.setObjectName("status_text")
+        self.stats_info_text.setReadOnly(True)
+        self.stats_info_text.setMaximumWidth(300)
+        self.stats_info_text.setPlaceholderText("Thông tin chi tiết sẽ hiển thị ở đây...")
+        stats_info_layout.addWidget(self.stats_info_text)
+        
+        content_layout.addWidget(stats_info_group, stretch=3)
+        
+        layout.addLayout(content_layout)
         
         return tab
         

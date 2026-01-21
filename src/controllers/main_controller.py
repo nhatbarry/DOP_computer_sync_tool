@@ -6,11 +6,31 @@ from PyQt5.QtCore import QThread, pyqtSignal
 from PyQt5.QtGui import QFont
 from models import SyncModel
 from views import MainWindow
-from .workers import InventorySyncWorker, MainSyncWorker, PartnersSyncWorker
+from .workers import InventorySyncWorker, MainSyncWorker, PartnersSyncWorker, StatsDataWorker
 
 import gspread
 from gspread.cell import Cell
 import pandas as pd
+
+
+class SheetNamesWorker(QThread):
+    """Worker thread to load sheet names without blocking UI"""
+    finished_signal = pyqtSignal(list)
+    
+    def __init__(self, credentials_path, sheet_id):
+        super().__init__()
+        self.credentials_path = credentials_path
+        self.sheet_id = sheet_id
+    
+    def run(self):
+        try:
+            gc = gspread.service_account(filename=self.credentials_path)
+            sale_sheet = gc.open(self.sheet_id)
+            sheet_names = [ws.title for ws in sale_sheet.worksheets()]
+            self.finished_signal.emit(sheet_names)
+        except Exception:
+            self.finished_signal.emit([])
+
 
 class SyncWorker(QThread):
     """
@@ -46,6 +66,8 @@ class MainController:
         QMessageBox().setFont(font)
         
         self.worker = None
+        self.sheet_names_worker = None
+        self.stats_data_worker = None
         self._connect_signals()
         self.view.destroyed.connect(self._save_current_data)
         self._load_saved_data()
@@ -92,6 +114,9 @@ class MainController:
         self.view.inventory_export_btn.clicked.connect(self.export_inventory_to_excel)
         self.view.partners_add_btn.clicked.connect(self.add_partner_row)
         self.view.partners_sync_btn.clicked.connect(self.sync_partners)
+        self.view.tab_widget.currentChanged.connect(self._on_tab_changed)
+        self.view.stats_date_combo.currentTextChanged.connect(self._on_stats_filter_changed)
+        self.view.stats_chart_type_combo.currentTextChanged.connect(self._on_chart_type_changed)
         self.model.sync_started.connect(self.on_sync_started)
         self.model.sync_progress.connect(self.on_sync_progress)
         self.model.sync_completed.connect(self.on_sync_completed)
@@ -177,6 +202,78 @@ class MainController:
     def on_data_changed(self, data):
         """Handle data change event from model"""
         pass
+    
+    def _on_tab_changed(self, index):
+        """Handle tab change event"""
+        if index == 3:
+            self._load_sheet_names_to_stats()
+    
+    def _load_sheet_names_to_stats(self):
+        """Load sheet names from Google Sheets to statistics tab"""
+        credentials_path = self.view.settings_credentials.text().strip()
+        sheet_don_hang = self.view.settings_sheet_id_don_hang.text().strip()
+        
+        if not credentials_path or not sheet_don_hang:
+            return
+        
+        if self.sheet_names_worker and self.sheet_names_worker.isRunning():
+            return
+        
+        self.sheet_names_worker = SheetNamesWorker(credentials_path, sheet_don_hang)
+        self.sheet_names_worker.finished_signal.connect(self._on_sheet_names_loaded)
+        self.sheet_names_worker.start()
+    
+    def _on_sheet_names_loaded(self, sheet_names):
+        """Handle loaded sheet names"""
+        self.view.stats_date_combo.clear()
+        self.view.stats_date_combo.addItem("Tất cả")
+        if sheet_names:
+            self.view.stats_date_combo.addItems(sheet_names)
+    
+    def _on_stats_filter_changed(self, sheet_name):
+        """Handle stats filter change - load data and update chart"""
+        if not sheet_name:
+            return
+        
+        credentials_path = self.view.settings_credentials.text().strip()
+        sheet_don_hang = self.view.settings_sheet_id_don_hang.text().strip()
+        
+        if not credentials_path or not sheet_don_hang:
+            return
+        
+        if self.stats_data_worker and self.stats_data_worker.isRunning():
+            return
+        
+        self.view.stats_info_text.setText("Đang tải dữ liệu...")
+        
+        self.stats_data_worker = StatsDataWorker(credentials_path, sheet_don_hang, sheet_name)
+        self.stats_data_worker.finished_signal.connect(self._on_stats_data_loaded)
+        self.stats_data_worker.error_signal.connect(self._on_stats_data_error)
+        self.stats_data_worker.start()
+    
+    def _on_stats_data_loaded(self, x_data, y1_data, y2_data, total_ck, total_cod):
+        """Handle loaded stats data - update chart"""
+        chart_type = self.view.stats_chart_type_combo.currentText()
+        self.view.stats_canvas.update_chart(x_data, y1_data, y2_data, chart_type)
+        
+        total = total_ck + total_cod
+        info_text = f"""📊 THỐNG KÊ DOANH THU
+
+💳 Chuyển khoản: {total_ck:,.0f} VNĐ
+💵 COD: {total_cod:,.0f} VNĐ
+━━━━━━━━━━━━━━━━━━
+💰 Tổng cộng: {total:,.0f} VNĐ
+
+📈 Số ngày có giao dịch: {len(x_data)}"""
+        self.view.stats_info_text.setText(info_text)
+    
+    def _on_stats_data_error(self, error_msg):
+        """Handle stats data error"""
+        self.view.stats_info_text.setText(f"❌ Lỗi: {error_msg}")
+    
+    def _on_chart_type_changed(self, chart_type):
+        """Handle chart type change - redraw chart"""
+        self._on_stats_filter_changed(self.view.stats_date_combo.currentText())
     
     def browse_credentials(self):
         """Browse for credentials file"""
