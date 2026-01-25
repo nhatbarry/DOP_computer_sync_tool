@@ -115,8 +115,7 @@ class MainController:
         self.view.partners_add_btn.clicked.connect(self.add_partner_row)
         self.view.partners_sync_btn.clicked.connect(self.sync_partners)
         self.view.tab_widget.currentChanged.connect(self._on_tab_changed)
-        self.view.stats_date_combo.currentTextChanged.connect(self._on_stats_filter_changed)
-        self.view.stats_chart_type_combo.currentTextChanged.connect(self._on_chart_type_changed)
+        self.view.stats_update_btn.clicked.connect(self._on_stats_update_clicked)
         self.model.sync_started.connect(self.on_sync_started)
         self.model.sync_progress.connect(self.on_sync_progress)
         self.model.sync_completed.connect(self.on_sync_completed)
@@ -230,8 +229,10 @@ class MainController:
         if sheet_names:
             self.view.stats_date_combo.addItems(sheet_names)
     
-    def _on_stats_filter_changed(self, sheet_name):
-        """Handle stats filter change - load data and update chart"""
+    def _on_stats_update_clicked(self):
+        """Handle stats update button click - load data and update chart"""
+        sheet_name = self.view.stats_date_combo.currentText()
+        
         if not sheet_name:
             return
         
@@ -239,6 +240,7 @@ class MainController:
         sheet_don_hang = self.view.settings_sheet_id_don_hang.text().strip()
         
         if not credentials_path or not sheet_don_hang:
+            self.view.stats_info_text.setText("⚠️ Vui lòng cấu hình đầy đủ thông tin ở tab Cài đặt")
             return
         
         if self.stats_data_worker and self.stats_data_worker.isRunning():
@@ -251,29 +253,38 @@ class MainController:
         self.stats_data_worker.error_signal.connect(self._on_stats_data_error)
         self.stats_data_worker.start()
     
-    def _on_stats_data_loaded(self, x_data, y1_data, y2_data, total_ck, total_cod):
+    def _on_stats_data_loaded(self, buyers, order_counts):
         """Handle loaded stats data - update chart"""
-        chart_type = self.view.stats_chart_type_combo.currentText()
-        self.view.stats_canvas.update_chart(x_data, y1_data, y2_data, chart_type)
+        self.view.stats_canvas.update_chart(buyers, order_counts)
         
-        total = total_ck + total_cod
-        info_text = f"""📊 THỐNG KÊ DOANH THU
+        total_orders = sum(order_counts)
+        total_buyers = len(buyers)
+        avg_orders = total_orders / total_buyers if total_buyers > 0 else 0
+        
+        # Tạo danh sách chi tiết từng người
+        buyer_details = []
+        for buyer, count in zip(buyers, order_counts):
+            buyer_details.append(f"  • {buyer}: {count} máy")
+        
+        details_text = "\n".join(buyer_details) if buyer_details else "  Không có dữ liệu"
+        
+        info_text = f"""📊 THỐNG KÊ ĐỐI TÁC
 
-💳 Chuyển khoản: {total_ck:,.0f} VNĐ
-💵 COD: {total_cod:,.0f} VNĐ
-━━━━━━━━━━━━━━━━━━
-💰 Tổng cộng: {total:,.0f} VNĐ
+👥 Số người mua: {total_buyers}
+💻 Tổng máy: {total_orders}
+📊 Trung bình: {avg_orders:.1f} máy/người
 
-📈 Số ngày có giao dịch: {len(x_data)}"""
+🏆 Nhiều nhất: {max(order_counts) if order_counts else 0} máy
+📉 Ít nhất: {min(order_counts) if order_counts else 0} máy
+
+━━━━━━━━━━━━━━━━━━━━━━━━
+📋 CHI TIẾT TỪNG NGƯỜI:
+{details_text}"""
         self.view.stats_info_text.setText(info_text)
     
     def _on_stats_data_error(self, error_msg):
         """Handle stats data error"""
         self.view.stats_info_text.setText(f"❌ Lỗi: {error_msg}")
-    
-    def _on_chart_type_changed(self, chart_type):
-        """Handle chart type change - redraw chart"""
-        self._on_stats_filter_changed(self.view.stats_date_combo.currentText())
     
     def browse_credentials(self):
         """Browse for credentials file"""

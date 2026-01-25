@@ -316,25 +316,11 @@ class MainWindow(QMainWindow):
         
         controls_layout.addSpacing(20)
         
-        chart_type_label = QLabel("Loại biểu đồ:")
-        controls_layout.addWidget(chart_type_label)
-        
-        self.stats_chart_type_combo = QComboBox()
-        self.stats_chart_type_combo.setObjectName("settings_combo")
-        self.stats_chart_type_combo.addItems(["Cột", "Đường", "Tròn", "Thanh ngang"])
-        self.stats_chart_type_combo.setMinimumWidth(150)
-        controls_layout.addWidget(self.stats_chart_type_combo)
-        
-        controls_layout.addSpacing(20)
-        
-        value_label = QLabel("Giá trị:")
-        controls_layout.addWidget(value_label)
-        
-        self.stats_value_combo = QComboBox()
-        self.stats_value_combo.setObjectName("settings_combo")
-        self.stats_value_combo.addItems(["Doanh thu", "Số lượng bán", "Tồn kho", "Đối tác", "Nhân viên"])
-        self.stats_value_combo.setMinimumWidth(150)
-        controls_layout.addWidget(self.stats_value_combo)
+        # Thêm nút cập nhật
+        self.stats_update_btn = QPushButton("🔄 Cập nhật")
+        self.stats_update_btn.setObjectName("action_btn")
+        self.stats_update_btn.setMinimumWidth(120)
+        controls_layout.addWidget(self.stats_update_btn)
         
         controls_layout.addStretch()
         
@@ -342,8 +328,16 @@ class MainWindow(QMainWindow):
         
         content_layout = QHBoxLayout()
         
+        # Wrap canvas in scroll area
+        canvas_scroll = QScrollArea()
+        canvas_scroll.setWidgetResizable(True)
+        canvas_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        canvas_scroll.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+        
         self.stats_canvas = Canvas(self)
-        content_layout.addWidget(self.stats_canvas, stretch=7)
+        canvas_scroll.setWidget(self.stats_canvas)
+        
+        content_layout.addWidget(canvas_scroll, stretch=7)
         
         stats_info_group = QGroupBox("Thông tin thống kê")
         stats_info_group.setObjectName("settings_group")
@@ -352,8 +346,12 @@ class MainWindow(QMainWindow):
         self.stats_info_text = QTextEdit()
         self.stats_info_text.setObjectName("status_text")
         self.stats_info_text.setReadOnly(True)
-        self.stats_info_text.setMaximumWidth(300)
+        self.stats_info_text.setMinimumWidth(250)
         self.stats_info_text.setPlaceholderText("Thông tin chi tiết sẽ hiển thị ở đây...")
+        # Set monospace font for better alignment
+        font = QFont("Consolas", 9)
+        self.stats_info_text.setFont(font)
+        self.stats_info_text.setLineWrapMode(QTextEdit.WidgetWidth)
         stats_info_layout.addWidget(self.stats_info_text)
         
         content_layout.addWidget(stats_info_group, stretch=3)
