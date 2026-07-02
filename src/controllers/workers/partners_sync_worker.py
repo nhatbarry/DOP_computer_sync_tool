@@ -81,6 +81,8 @@ class PartnersSyncWorker(QThread):
                             
                             if ghi_chu == 'màn':
                                 target_column = 'màn'
+                            if ghi_chu == 'tình trạng':
+                                target_column = 'tình trạng'
                             elif type_pin_header in df.columns and pd.notna(data_row.get(type_pin_header)) and str(data_row.get(type_pin_header)).strip():
                                 target_column = 'pin'
                             else:
